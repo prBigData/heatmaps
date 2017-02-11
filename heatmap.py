@@ -44,7 +44,8 @@ def get_all(spark, sqlContext, before, after):
     return p
 
 
-def plot_all(spark, sqlContext, before, after):
+def plot_all(spark, sqlContext, before, after, filename="plot",
+             file_path="./plots/"):
     """plot any detected vessel position between two timestamps"""
 
     filename += '_'
@@ -91,4 +92,4 @@ def plot_all(spark, sqlContext, before, after):
 
     plt.savefig(
         file_path + filename + str(before) + '_' + str(after) + '_svm.pdf',
-        format="pdf")
+        format="pdf")s
