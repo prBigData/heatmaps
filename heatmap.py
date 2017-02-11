@@ -40,22 +40,35 @@ def get_all(spark, sqlContext, before, after):
         v.timestamps < before
     ).collect()
 
-# CLEANING TO FINISH
+    # report values : 2016-12-10 22:53:00 < ts < 2016-12-10 22:54:00
+    return p
 
-t = spark.sql("SELECT mmsi, timestamps, latitude, longitude FROM vessels WHERE timestamps >= \"2016-12-10 22:53:00\" AND timestamps < \"2016-12-10 22:54:00\" ")
-t.createOrReplaceTempView("unique_time")
-coo = spark.sql("SELECT latitude, longitude FROM unique_time")
-dfLat = coo.rdd.map(lambda l:  l.latitude).collect()
-dfLong = coo.rdd.map(lambda l:  l.longitude).collect()
-data = np.array([[dfLong[i], dfLat[i]] for i in range(0, len(dfLat))])
-rbf_clf = svm.OneClassSVM(nu=0.3, kernel="rbf", gamma=0.2)
-rbf_clf.fit(data)
-xx, yy = np.meshgrid(np.linspace(-4, 37, 50), np.linspace(26, 48, 50))
-rbf_Z = rbf_clf.decision_function(np.c_[xx.ravel(), yy.ravel()])
-rbf_Z = rbf_Z.reshape(xx.shape)
 
-fig = plt.figure()
-map = Basemap(
+def plot_all(spark, sqlContext, before, after):
+    """plot any detected vessel position between two timestamps"""
+
+    filename += '_'
+    rows = get_all(spark, sqlContext, before, after)
+
+    # SVM
+    # Format data the way we need
+    data = np.array(
+        [[row['longitude'], row['latitude']] for row in rows]
+        )
+
+    # Apply SVM
+    OCS = svm.OneClassSVM(nu=0.1, kernel="rbf", gamma=1)
+    OCS.fit(data)
+
+    # divide 2D space into subdivisions
+    xx, yy = np.meshgrid(np.linspace(-4, 37, 50), np.linspace(26, 48, 50))
+
+    # get the decision boundary on that space subdivision
+    Z = OCS.decision_function(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+
+    # plot
+    m = Basemap(
         projection='gall',
         llcrnrlon=-4,              # lower-left corner longitude
         llcrnrlat=26,               # lower-left corner latitude
@@ -63,19 +76,19 @@ map = Basemap(
         urcrnrlat=48,               # upper-right corner latitude
         resolution='l',
         area_thresh=1000.0,
-    )
+        )
+    e = m.drawcoastlines()
+    e = m.drawcountries()
+    e = m.drawmapboundary(fill_color='steelblue')
+    x, y = m(xx, yy)  # mandatory
+    e = m.contourf(x, y, Z, levels=np.linspace(Z.min(), 0, 7), cmap=plt.cm.PuBu)
+    e = m.contour(x, y, Z, levels=[0], linewidths=2, colors='darkred')
+    e = m.contourf(x, y, Z, levels=[0, Z.max()], colors='palevioletred')
+    x, y = m(data[:, 0], data[:, 1])  # mandatory
+    e = m.scatter(x, y, c='gold', s=10)
+    e = m.fillcontinents(color='gainsboro', lake_color="lime")
+    # plt.show()
 
-map.drawcoastlines()
-map.drawcountries()
-map.fillcontinents(color='grey', zorder=0)  # alpha=0.5
-
-x, y = map(xx, yy)
-datax, datay = map(data[:, 0], data[:, 1])
-map.contourf(
-    x, y, rbf_Z,
-    levels=np.linspace(rbf_Z.min(), 0, 7), cmap=plt.cm.PuBu)
-a = map.contour(x, y, rbf_Z, levels=[0], linewidths=2, colors='darkred')
-map.contourf(x, y, rbf_Z, levels=[0, rbf_Z.max()], colors='palevioletred')
-pt = map.scatter(datax, datay, c='gold', s=20, zorder=1)
-plt.title("Density map of the vessels in Mediterranean sea")
-plt.savefig('fig/fig14.png')
+    plt.savefig(
+        file_path + filename + str(before) + '_' + str(after) + '_svm.pdf',
+        format="pdf")
