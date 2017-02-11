@@ -1,5 +1,6 @@
 """
 SINGLE VESSEL TRIP PACKAGE :
+
 Every helper we could develop to plot a vessel's trip
 """
 
@@ -14,7 +15,7 @@ from sklearn import svm
 
 
 def load_pos_data(spark, sqlContext):
-    """LOAD DATAS"""
+    """initial data loading"""
 
     # load tables and create a view
     positions = sqlContext.read.format(
