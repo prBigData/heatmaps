@@ -92,4 +92,4 @@ def plot_all(spark, sqlContext, before, after, filename="plot",
 
     plt.savefig(
         file_path + filename + str(before) + '_' + str(after) + '_svm.pdf',
-        format="pdf")s
+        format="pdf")
